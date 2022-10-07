@@ -1,0 +1,11 @@
+{
+  "max":10,
+  "Pool":10,
+  "tcpPort":8787,
+  "name":"thHandler",
+  "taskLen":100,
+  "httpPort":8789,
+  "msgChanLen":1000,
+  "maxPacketSize":1000,
+  "ip":"127.0.0.1"
+}

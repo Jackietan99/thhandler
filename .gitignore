@@ -1,0 +1,14 @@
+.idea
+.DS_Store
+go.sum
+*.test
+*.out
+*.log
+*.local.ini
+.gitlab-ci.yml
+.vscode
+
+*_test.go
+
+server
+server.exe

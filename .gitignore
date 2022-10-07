@@ -10,5 +10,4 @@ go.sum
 
 *_test.go
 
-server
 server.exe

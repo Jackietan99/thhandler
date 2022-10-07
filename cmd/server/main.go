@@ -27,4 +27,5 @@ func main() {
 			panic(err)
 		}
 	}
+	select {}
 }

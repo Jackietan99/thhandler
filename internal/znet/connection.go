@@ -1,11 +1,12 @@
 package znet
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net"
+	"strings"
 	"sync"
 	"thHandler/internal/config"
 	"thHandler/internal/znet/ziface"
@@ -94,54 +95,57 @@ func (c *Connection) StartReader() {
 	defer fmt.Println(c.RemoteAddr().String(), "[conn Reader exit!]")
 	defer c.Stop()
 
-	// 创建拆包解包的对象
 	for {
 		select {
 		case <-c.ctx.Done():
 			return
 		default:
 
-			//读取客户端的Msg head
-			headData := make([]byte, c.TCPServer.Packet().GetHeadLen())
-			if _, err := io.ReadFull(c.Conn, headData); err != nil {
-				fmt.Println("read msg head error ", err)
-				return
-			}
-			//fmt.Printf("read headData %+v\n", headData)
+			// 创建拆包解包的对象
+			reader := bufio.NewReader(c.Conn)
 
-			//拆包，得到msgID 和 datalen 放在msg中
-			msg, err := c.TCPServer.Packet().Unpack(headData)
-			if err != nil {
-				fmt.Println("unpack error ", err)
-				return
-			}
-
-			//根据 dataLen 读取 data，放在msg.Data中
-			var data []byte
-			if msg.GetDataLen() > 0 {
-				data = make([]byte, msg.GetDataLen())
-				if _, err := io.ReadFull(c.Conn, data); err != nil {
-					fmt.Println("read msg data error ", err)
-					return
+			scanner := bufio.NewScanner(reader)
+			scanner.Split(ScanEnd)
+			for scanner.Scan() {
+				//得到当前客户端请求的Request数据
+				bytes := scanner.Bytes()
+				fmt.Println(string(bytes))
+				req := Request{
+					conn: c,
+					msg: &Message{
+						Data: bytes,
+					},
 				}
-			}
-			msg.SetData(data)
-
-			//得到当前客户端请求的Request数据
-			req := Request{
-				conn: c,
-				msg:  msg,
-			}
-
-			if config.Conf.Pool > 0 {
-				//已经启动工作池机制，将消息交给Worker处理
-				c.MsgHandler.SendMsgToTaskQueue(&req)
-			} else {
-				//从绑定好的消息和对应的处理方法中执行对应的Handle方法
-				go c.MsgHandler.DoMsgHandler(&req)
+				if config.Conf.Pool > 0 {
+					//已经启动工作池机制，将消息交给Worker处理
+					c.MsgHandler.SendMsgToTaskQueue(&req)
+				} else {
+					//从绑定好的消息和对应的处理方法中执行对应的Handle方法
+					go c.MsgHandler.DoMsgHandler(&req)
+				}
 			}
 		}
 	}
+}
+
+func ScanEnd(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	//如果数据为空，数据已经读完直接返回
+	if atEOF && len(data) == 0 {
+		return 0, nil, nil
+	}
+	// 获取自定义的结束标志位的位置
+	index := strings.Index(string(data), "00000000")
+	if index > 0 {
+		//如果找到 返回的第一个参数为后推的字符长度
+		//第二个参数则指标志位之前的字符
+		//第三个参数为是否有错误
+		return index + 8, data[0 : index-2], nil
+	}
+	if atEOF {
+		return len(data), data, nil
+	}
+	//如果没有找到则返回0，nil，nil
+	return 0, nil, nil
 }
 
 //Start 启动连接，让当前连接开始工作

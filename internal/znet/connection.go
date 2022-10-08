@@ -109,7 +109,6 @@ func (c *Connection) StartReader() {
 			for scanner.Scan() {
 				//得到当前客户端请求的Request数据
 				bytes := scanner.Bytes()
-				fmt.Println(string(bytes))
 				req := Request{
 					conn: c,
 					msg: &Message{
